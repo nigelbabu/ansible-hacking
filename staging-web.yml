@@ -1,0 +1,47 @@
+---
+- hosts: staging
+  vars:
+   - user: "okfn"
+  vars_prompt:
+   - name: version
+     prompt: "Ckan Version"
+     private: False
+   - name: instance_name
+     prompt: "Instance Name"
+     private: False
+  tasks:
+   - name: create necessary folders
+     sudo: yes
+     file: path={{ item }} state=directory owner={{ user }}
+     with_items:
+       - /etc/ckan/{{instance_name}}
+       - /usr/lib/ckan/{{instance_name}}
+       - /var/lib/ckan/{{instance_name}}
+
+   - name: pull ckan version
+     sudo: yes
+     git: repo=https://github.com/okfn/ckan dest=/usr/lib/ckan/{{ instance_name }}/src/ckan version=release-v{{version}}
+
+   - name: change owner
+     sudo: yes
+     file: path=/usr/lib/ckan/{{ instance_name }}/src/ckan state=directory owner={{ user }}
+
+   - name: check requirements file name
+     shell: "[ -f /usr/lib/ckan/{{instance_name}}/src/ckan/pip-requirements.txt ] && echo 'pip-requirements.txt' || echo 'requirements.txt'"
+     register: requirements_file_name
+
+   - name: install requirements and make virtualenv
+     pip: requirements=/usr/lib/ckan/{{instance_name}}/src/ckan/{{requirements_file_name.stdout}} virtualenv=/usr/lib/ckan/{{instance_name}}/ virtualenv_site_packages=no
+
+   - name: run setup.py develop for ckan
+     command: chdir=/usr/lib/ckan/{{instance_name}}/src/ckan/ ../../bin/python setup.py develop
+
+   - name: copy who.ini
+     file: src=/usr/lib/ckan/{{ instance_name }}/src/ckan/who.ini dest=/etc/ckan/{{ instance_name }}/who.ini state=link owner={{ user }}
+
+   - name: create apache.ini
+     template: src=templates/apache_wsgi.j2 dest=/etc/ckan/{{ instance_name }}/apache.wsgi owner=okfn mode=755
+
+   - name: create virtualhost
+     template: src=templates/virtualhost.j2 dest=/etc/apache2/sites-available/{{ instance_name }} owner=root mode=744
+     sudo: yes

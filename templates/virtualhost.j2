@@ -1,0 +1,21 @@
+<VirtualHost 0.0.0.0:8080>
+
+    ServerName {{ instance_name }}.staging.ckanhosted.com
+    ServerAlias www.{{ instance_name }}.staging.ckanhosted.com
+
+    # this is our app
+    WSGIScriptAlias / /etc/ckan/{{ instance_name }}/apache.wsgi
+
+    # pass authorization info on (needed for rest api)
+    WSGIPassAuthorization On
+
+    # Deploy as a daemon (avoids conflicts between CKAN instances)
+    WSGIDaemonProcess {{ instance_name }} display-name={{ instance_name }} processes=2 threads=15
+
+    WSGIProcessGroup {{ instance_name }}
+
+    ErrorLog /var/log/apache2/{{ instance_name }}.error.log
+    CustomLog /var/log/apache2/{{ instance_name }}.custom.log combined
+
+</VirtualHost>
+
